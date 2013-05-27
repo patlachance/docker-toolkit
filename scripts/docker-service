@@ -1,0 +1,114 @@
+#!/bin/bash
+# vim: set foldmethod=marker shiftwidth=2 st=2 ts=2 expandtab:
+
+DOCKER_SERVICE_VERSION="0.1"
+
+SERVICE_NOT_FOUND="SERVICE_NOT_FOUND"
+
+BASE_DIR=$(readlink -f $(dirname "$0"))
+
+## lib {{{
+
+get_config() {
+  cat $config_file
+}
+
+get_container_id() {
+  service="$1"
+  (get_config | jshon -e services -e $service -u 2>/dev/null) || echo $SERVICE_NOT_FOUND
+}
+
+## }}} lib
+
+## Commands {{{
+
+cmd_help() {
+  cat << EOF
+Usage: docker-service [options...] <command> [<args>]
+
+Commands:
+
+  list       List all managed docker service
+  ip         Get ip address for running docker service
+  version    Show version
+  help       Show this help
+
+Options:
+
+  -c, --config <config_file> default '~/.docker_service.json'
+EOF
+}
+
+cmd_version() {
+  echo "docker-service version $DOCKER_SERVICE_VERSION"
+}
+
+cmd_list() {
+  PS_INFO=$(docker ps)
+  echo "Services:"
+  for service in $(get_config | jshon -e services -k); do
+    container_id=$(get_container_id $service)
+    status=""
+    (echo "$PS_INFO" | grep $container_id > /dev/null) && status="RUNNING"
+    printf "  %-20s %-20s %s\n" $service $container_id $status
+  done
+}
+
+cmd_ip() {
+  if (( $# != 1 )); then
+    cmd_help ip
+    exit 1
+  fi
+
+  service=$1
+  container_id=$(get_container_id $service)
+  [[ $container_id == "$SERVICE_NOT_FOUND" ]] && {
+    echo "service '$service' not found." >&2
+    exit 1
+  }
+  $BASE_DIR/docker-ip $container_id || {
+    echo "service '$service' not running." >&2
+    exit 1
+  }
+}
+
+## }}} Commands
+
+## main {{{
+set -e
+
+ARGS=$(getopt -o c: -l "config:" -n "docker-service" -- "$@");
+eval set -- "$ARGS"
+
+config_file="$HOME/.docker_service.json"
+
+while true; do
+  case "$1" in
+    -c|--config)
+      shift
+      if [ -n "$1" ]; then
+        config_file="$1"
+        shift
+      fi
+      ;;
+    --)
+      shift
+      break
+      ;;
+  esac
+done
+
+set +e
+command=$1
+shift
+set -e
+
+case $command in
+  list)     cmd_list "$@";;
+  ip)       cmd_ip "$@";;
+  version)  cmd_version;;
+  help)     cmd_help "$@";;
+  *)        cmd_help
+            exit 2;;
+esac
+## }}} main

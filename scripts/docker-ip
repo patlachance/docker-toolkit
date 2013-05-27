@@ -1,0 +1,8 @@
+#!/bin/bash
+
+ip=$(docker inspect $1 | jshon -e NetworkSettings -e IpAddress -u)
+if [[ "$ip" == "" ]]; then
+  exit 1
+else
+  echo "$ip"
+fi

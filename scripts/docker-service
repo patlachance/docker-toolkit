@@ -30,6 +30,8 @@ Commands:
 
   list       List all managed docker service
   ip         Get ip address for running docker service
+  start      Start a docker service
+  stop       Stop a docker service
   version    Show version
   help       Show this help
 
@@ -72,6 +74,38 @@ cmd_ip() {
   }
 }
 
+cmd_start() {
+  if (( $# != 1 )); then
+    cmd_help start
+    exit 1
+  fi
+
+  service=$1
+  container_id=$(get_container_id $service)
+  [[ $container_id == "$SERVICE_NOT_FOUND" ]] && {
+    echo "service '$service' not found." >&2
+    exit 1
+  }
+
+  docker start $container_id
+}
+
+cmd_stop() {
+  if (( $# != 1 )); then
+    cmd_help start
+    exit 1
+  fi
+
+  service=$1
+  container_id=$(get_container_id $service)
+  [[ $container_id == "$SERVICE_NOT_FOUND" ]] && {
+    echo "service '$service' not found." >&2
+    exit 1
+  }
+
+  docker stop $container_id
+}
+
 ## }}} Commands
 
 ## main {{{
@@ -106,6 +140,8 @@ set -e
 case $command in
   list)     cmd_list "$@";;
   ip)       cmd_ip "$@";;
+  start)    cmd_start "$@";;
+  stop)     cmd_stop "$@";;
   version)  cmd_version;;
   help)     cmd_help "$@";;
   *)        cmd_help
